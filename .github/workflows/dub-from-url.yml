@@ -1,0 +1,95 @@
+name: Dub from URL
+
+on:
+  workflow_dispatch:
+    inputs:
+      video_url:
+        description: "Direct download URL of the video/audio file"
+        required: true
+        type: string
+      target:
+        description: "Target language code(s), space-separated"
+        required: true
+        default: "ml-IN"
+        type: string
+      src_lang:
+        description: "Source language code"
+        required: true
+        default: "en-IN"
+        type: string
+      dry_run:
+        description: "Only estimate cost (no API spend)"
+        required: true
+        default: false
+        type: boolean
+
+jobs:
+  dub:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install system + Python deps
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends ffmpeg
+          pip install -r requirements.txt
+
+      - name: Download input
+        id: download
+        run: |
+          mkdir -p input
+          url="${{ inputs.video_url }}"
+          base=$(basename "${url%%\?*}")
+          if [[ ! "$base" =~ \.(mp4|mov|mkv|webm|avi|wav|mp3|m4a)$ ]]; then
+            base="input.mp4"
+          fi
+          echo "Saving as input/$base"
+          curl -fsSL -L --retry 3 -o "input/$base" "$url"
+          ls -lh "input/$base"
+          echo "file=input/$base" >> "$GITHUB_OUTPUT"
+
+      - name: Run dubber
+        env:
+          SARVAM_API_KEY: ${{ secrets.SARVAM_API_KEY }}
+        run: |
+          set -e
+          mkdir -p dubbed
+          ARGS=( "${{ steps.download.outputs.file }}" --out dubbed --src-lang "${{ inputs.src_lang }}" --target ${{ inputs.target }} )
+          if [ "${{ inputs.dry_run }}" = "true" ]; then
+            ARGS+=( --dry-run )
+          fi
+          echo "Running: python video_dubber.py ${ARGS[*]}"
+          python video_dubber.py "${ARGS[@]}"
+
+      - name: Upload dubbed output
+        if: ${{ inputs.dry_run == false }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: dubbed-output
+          path: dubbed/
+          if-no-files-found: warn
+          retention-days: 7
+
+      - name: Job summary
+        if: always()
+        run: |
+          {
+            echo "## Dub from URL"
+            echo ""
+            echo "- **Target:** \`${{ inputs.target }}\`"
+            echo "- **Source lang:** \`${{ inputs.src_lang }}\`"
+            echo "- **Dry run:** \`${{ inputs.dry_run }}\`"
+            echo "- **Input URL:** \`${{ inputs.video_url }}\`"
+            echo ""
+            if [ "${{ inputs.dry_run }}" = "false" ]; then
+              echo "Download the **dubbed-output** artifact from this run when the job succeeds."
+            fi
+          } >> "$GITHUB_STEP_SUMMARY"
