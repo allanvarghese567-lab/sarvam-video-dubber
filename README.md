@@ -44,6 +44,32 @@ cp .env.example .env
 export SARVAM_API_KEY="your-key"   # or load from .env with your preferred tool
 ```
 
+## Docker
+
+```bash
+# Build
+docker build -t sarvam-video-dubber .
+
+# Cost estimate (mount current dir so the container can see your files)
+docker run --rm -e SARVAM_API_KEY -v "$PWD:/data" \
+  sarvam-video-dubber /data/movie.mp4 --dry-run
+
+# Dub and write results back to ./dubbed on the host
+docker run --rm -e SARVAM_API_KEY \
+  -v "$PWD:/data" \
+  -v "$PWD/dubbed:/app/dubbed" \
+  -v "$PWD/dubbing_state.json:/app/dubbing_state.json" \
+  sarvam-video-dubber /data/movie.mp4
+
+# Folder + multiple languages
+docker run --rm -e SARVAM_API_KEY \
+  -v "$PWD:/data" \
+  -v "$PWD/dubbed:/app/dubbed" \
+  sarvam-video-dubber /data/episodes -r --target ml-IN hi-IN --workers 2
+```
+
+The image includes `ffmpeg`/`ffprobe` and the Python dependencies. Pass any CLI flags after the image name.
+
 ## Usage
 
 ```bash
