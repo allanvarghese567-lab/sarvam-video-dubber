@@ -1,0 +1,29 @@
+# Secrets / local state
+.env
+.env.*
+!.env.example
+dubbing_state.json
+*.tmp
+
+# Output
+dubbed/
+*.part
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+dist/
+build/
+.venv/
+venv/
+env/
+
+# IDE / OS
+.idea/
+.vscode/
+.DS_Store
+*.swp
+*~
